@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -43,8 +42,12 @@ public class AnomalyScript : MonoBehaviour
     [Header("UI Panels")]
     [SerializeField] private GameObject mainMenuPanel;
     [SerializeField] private GameObject gameplayHUD;
+    [Header("Report UI")]
+    [SerializeField] private GameObject reportButton; // Drag your main Report button here
     [SerializeField] private GameObject typeSelectionPanel;
     [SerializeField] private GameObject resultPanel;
+    [Header("Quit Confirmation UI")]
+    [SerializeField] private GameObject quitConfirmationPanel;
 
     [Header("UI Text")]
     [SerializeField] private TMP_Text resultTitle;
@@ -59,7 +62,7 @@ public class AnomalyScript : MonoBehaviour
 
     [Header("Survival Settings")]
     [SerializeField] private float secondsPerGameMinute = 1f;
-    [SerializeField] private int gameDurationMinutes = 360;
+    [SerializeField] private int gameDurationMinutes = 60;
     [SerializeField] private int anomalyIntervalMinutes = 10;
 
     [Header("Warning Settings")]
@@ -97,6 +100,7 @@ public class AnomalyScript : MonoBehaviour
 
     private void Start()
     {
+        Debug.Log("[AnomalyScript] Start() initialized.");
         Time.timeScale = 0f;
 
         ResetAllToNormal();
@@ -104,6 +108,9 @@ public class AnomalyScript : MonoBehaviour
 
         if (mainMenuPanel != null)
             mainMenuPanel.SetActive(true);
+
+        if (gameplayHUD != null)
+            gameplayHUD.SetActive(false);
 
         if (resultPanel != null)
             resultPanel.SetActive(false);
@@ -163,6 +170,8 @@ public class AnomalyScript : MonoBehaviour
 
     public void StartGame()
     {
+        Debug.Log("[AnomalyScript] StartGame() button clicked.");
+
         ResetAllToNormal();
 
         elapsedGameMinutes = 0f;
@@ -171,12 +180,20 @@ public class AnomalyScript : MonoBehaviour
         firstWarningShown = false;
         isGameRunning = true;
 
-        // Hide other panels
-        mainMenuPanel.SetActive(false);
-        resultPanel.SetActive(false);
+        if (mainMenuPanel != null)
+            mainMenuPanel.SetActive(false);
 
-        // Show gameplay interface
-        gameplayHUD.SetActive(true);
+        if (resultPanel != null)
+            resultPanel.SetActive(false);
+
+        if (gameplayHUD != null)
+        {
+            gameplayHUD.SetActive(true);
+        }
+        else
+        {
+            Debug.LogError("[AnomalyScript] gameplayHUD reference is missing in the Inspector!");
+        }
 
         CloseAllPanels();
 
@@ -184,32 +201,33 @@ public class AnomalyScript : MonoBehaviour
             warningText.text = "";
 
         Time.timeScale = 1f;
-
         UpdateHUD();
     }
 
     public void ReturnToMainMenu()
     {
+        Debug.Log("[AnomalyScript] ReturnToMainMenu() called.");
         isGameRunning = false;
         Time.timeScale = 0f;
 
         ResetAllToNormal();
         CloseAllPanels();
+        if (reportButton != null)
+            reportButton.SetActive(true);
 
-        gameplayHUD.SetActive(false);
-        resultPanel.SetActive(false);
-        mainMenuPanel.SetActive(true);
+        if (gameplayHUD != null) gameplayHUD.SetActive(false);
+        if (resultPanel != null) resultPanel.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
     }
 
     public void QuitGame()
     {
+        Debug.Log("[AnomalyScript] QuitGame() called.");
         Application.Quit();
-
-        Debug.Log("Game Quit");
     }
 
     // ==========================================
-    // SURVIVAL TIMER
+    // SURVIVAL TIMER & HUD
     // ==========================================
 
     private void UpdateHUD()
@@ -233,6 +251,37 @@ public class AnomalyScript : MonoBehaviour
         }
     }
 
+    // Called when the user clicks the initial "Quit" button
+    public void PromptQuitGame()
+    {
+        if (quitConfirmationPanel != null)
+        {
+            quitConfirmationPanel.SetActive(true);
+        }
+    }
+
+    // Called when the user clicks "No" on the confirmation prompt
+    public void CancelQuit()
+    {
+        if (quitConfirmationPanel != null)
+        {
+            quitConfirmationPanel.SetActive(false);
+        }
+    }
+
+    // Called when the user clicks "Yes" on the confirmation prompt
+    public void ConfirmQuitGame()
+    {
+        Debug.Log("[AnomalyScript] Quitting game...");
+        Application.Quit();
+        
+        // Note: Application.Quit() does not close the editor during Play mode, 
+        // so we can also stop play mode if testing in the Unity Editor:
+        #if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+        #endif
+    }
+
     // ==========================================
     // WARNING SYSTEM
     // ==========================================
@@ -249,7 +298,7 @@ public class AnomalyScript : MonoBehaviour
             if (warningText != null)
             {
                 warningText.text =
-                    "WARNING 1: Too many anomalies detected!";
+                    "Too many anomalies detected!\n Please report them immediately!";
             }
 
             Debug.LogWarning(
@@ -263,6 +312,7 @@ public class AnomalyScript : MonoBehaviour
 
     private void ShowResult(string title, string description)
     {
+        Debug.Log("[AnomalyScript] ShowResult: " + title);
         isGameRunning = false;
         Time.timeScale = 0f;
 
@@ -285,7 +335,7 @@ public class AnomalyScript : MonoBehaviour
     {
         ShowResult(
             "YOU SURVIVED",
-            "You successfully survived until 06:00 AM!"
+            "Thank you for testing!"
         );
     }
 
@@ -305,11 +355,22 @@ public class AnomalyScript : MonoBehaviour
     public void OpenReportMenu()
     {
         if (!isGameRunning)
+        {
+            Debug.LogWarning("[AnomalyScript] Cannot open report menu - game is not running!");
             return;
+        }
 
         CloseAllPanels();
         selectedItemName = "";
 
+        if (typeSelectionPanel != null)
+            typeSelectionPanel.SetActive(true);
+        else
+            Debug.LogError("[AnomalyScript] typeSelectionPanel reference is missing in the Inspector!");
+
+        // Hide the main report button while reporting
+        if (reportButton != null)
+            reportButton.SetActive(false);
     }
 
     public void CloseAllPanels()
@@ -318,11 +379,15 @@ public class AnomalyScript : MonoBehaviour
             typeSelectionPanel.SetActive(false);
 
         selectedItemName = "";
+
+        if (reportButton != null)
+        reportButton.SetActive(true);
     }
 
     public void SelectItemToReport(string itemName)
     {
         selectedItemName = itemName;
+        Debug.Log("[AnomalyScript] Item selected for reporting: '" + selectedItemName + "'");
 
         if (typeSelectionPanel != null)
             typeSelectionPanel.SetActive(true);
@@ -330,81 +395,59 @@ public class AnomalyScript : MonoBehaviour
 
     public void SubmitAnomalyType(string anomalyTypeString)
     {
-        if (!Enum.TryParse(
-            anomalyTypeString,
-            true,
-            out AnomalyType reportedType))
+        if (!Enum.TryParse(anomalyTypeString, true, out AnomalyType reportedType))
         {
-            Debug.LogError(
-                "Invalid AnomalyType: " + anomalyTypeString);
-
+            Debug.LogError("[AnomalyScript] Invalid AnomalyType string: " + anomalyTypeString);
             CloseAllPanels();
             return;
         }
 
-        EvaluateReport(selectedItemName, reportedType);
-
+        Debug.Log("[AnomalyScript] Submitting report for anomaly type: " + reportedType);
+        EvaluateAndFixByType(reportedType);
         CloseAllPanels();
     }
 
     // ==========================================
-    // REPORT VERIFICATION
+    // REPORT VERIFICATION & FIXING
     // ==========================================
 
-    private void EvaluateReport(
-        string reportedItem,
-        AnomalyType reportedType)
+    private void EvaluateAndFixByType(AnomalyType reportedType)
     {
-        int targetIndex = -1;
         ActiveAnomaly targetAnomaly = null;
+        int targetIndex = -1;
 
-        // Find the reported item's active anomaly
+        // Find the first active anomaly that matches the reported type
         foreach (ActiveAnomaly anomaly in activeAnomalies)
         {
-            ItemData item = items[anomaly.itemIndex];
-
-            if (string.Equals(
-                item.itemName,
-                reportedItem,
-                StringComparison.OrdinalIgnoreCase))
+            if (anomaly != null && anomaly.variant != null && anomaly.variant.anomalyType == reportedType)
             {
-                targetIndex = anomaly.itemIndex;
                 targetAnomaly = anomaly;
-                break;
+                targetIndex = anomaly.itemIndex;
+                break; // Fixes the first found matching anomaly type
             }
         }
 
         if (targetAnomaly == null)
         {
-            Debug.LogWarning(
-                "Wrong report: No active anomaly on " + reportedItem);
-
+            Debug.LogWarning("[AnomalyScript] Wrong report: No active anomaly of type " + reportedType + " found!");
             return;
         }
 
-        if (targetAnomaly.variant.anomalyType == reportedType)
+        Debug.Log("[AnomalyScript] Correct! Fixed anomaly on item index: " + targetIndex);
+
+        // Remove from active tracking list
+        activeAnomalies.Remove(targetAnomaly);
+
+        // Reset the item back to normal state
+        ResetItemToNormal(targetIndex);
+
+        // Clear warning text if back under threshold
+        if (activeAnomalies.Count < firstWarningThreshold && warningText != null)
         {
-            Debug.Log(
-                "Correct! Fixed " + reportedItem);
-
-            activeAnomalies.Remove(targetAnomaly);
-
-            ResetItemToNormal(targetIndex);
-
-            // Update warning text if the situation is contained
-            if (activeAnomalies.Count < firstWarningThreshold &&
-                warningText != null)
-            {
-                warningText.text = "";
-            }
-
-            UpdateHUD();
+            warningText.text = "";
         }
-        else
-        {
-            Debug.LogWarning(
-                "Wrong anomaly type for " + reportedItem);
-        }
+
+        UpdateHUD();
     }
 
     // ==========================================
@@ -415,6 +458,8 @@ public class AnomalyScript : MonoBehaviour
     {
         activeAnomalies.Clear();
 
+        if (items == null) return;
+
         for (int i = 0; i < items.Count; i++)
         {
             ResetItemToNormal(i);
@@ -423,15 +468,23 @@ public class AnomalyScript : MonoBehaviour
 
     private void ResetItemToNormal(int index)
     {
+        if (items == null || index < 0 || index >= items.Count) return;
+
         ItemData item = items[index];
+        if (item == null) return;
 
         if (item.normalState != null)
             item.normalState.SetActive(true);
 
-        foreach (AnomalyVariant variant in item.anomalyVariants)
+        if (item.anomalyVariants != null)
         {
-            if (variant.anomalyObject != null)
-                variant.anomalyObject.SetActive(false);
+            foreach (AnomalyVariant variant in item.anomalyVariants)
+            {
+                if (variant != null && variant.anomalyObject != null)
+                {
+                    variant.anomalyObject.SetActive(false);
+                }
+            }
         }
     }
 
@@ -447,20 +500,21 @@ public class AnomalyScript : MonoBehaviour
 
     private void SpawnRandomAnomaly()
     {
+        if (items == null || items.Count == 0) return;
+
         List<int> validIndices = new List<int>();
 
         for (int i = 0; i < items.Count; i++)
         {
             ItemData item = items[i];
+            if (item == null) continue;
 
             if (item.anomalyVariants == null ||
                 item.anomalyVariants.Count == 0)
                 continue;
 
-            // Don't spawn another anomaly on an already
-            // affected item
             bool alreadyActive = activeAnomalies.Exists(
-                a => a.itemIndex == i);
+                a => a != null && a.itemIndex == i);
 
             if (!alreadyActive)
                 validIndices.Add(i);
@@ -470,23 +524,24 @@ public class AnomalyScript : MonoBehaviour
         {
             Debug.LogWarning(
                 "No available items for another anomaly.");
-
             return;
         }
 
-        // Select random item
         int chosenIndex = validIndices[
             UnityEngine.Random.Range(0, validIndices.Count)];
 
         ItemData chosenItem = items[chosenIndex];
+        if (chosenItem == null || chosenItem.anomalyVariants == null || chosenItem.anomalyVariants.Count == 0)
+            return;
 
-        // Select random anomaly variant
         AnomalyVariant chosenVariant =
             chosenItem.anomalyVariants[
                 UnityEngine.Random.Range(
                     0, chosenItem.anomalyVariants.Count)];
 
-        // Apply anomaly
+        if (chosenVariant == null) return;
+
+        // Apply anomaly state safely
         if (chosenVariant.anomalyType != AnomalyType.ExtraObject)
         {
             if (chosenItem.normalState != null)
@@ -494,9 +549,10 @@ public class AnomalyScript : MonoBehaviour
         }
 
         if (chosenVariant.anomalyObject != null)
+        {
             chosenVariant.anomalyObject.SetActive(true);
+        }
 
-        // Register active anomaly
         ActiveAnomaly newAnomaly = new ActiveAnomaly
         {
             itemIndex = chosenIndex,
